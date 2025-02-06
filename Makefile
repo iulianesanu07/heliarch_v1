@@ -5,6 +5,7 @@ LDFLAGS = -L/opt/homebrew/lib -framework OpenGL -lGLEW -lglfw
 SRC_DIR = src
 OBJ_DIR = obj
 BUILD_DIR = build
+PLIST = Info.plist
 
 # Trouve tous les fichiers sources
 SOURCES = $(wildcard $(SRC_DIR)/*.cpp)
@@ -17,7 +18,7 @@ all: $(TARGET)
 # Création de l'exécutable
 $(TARGET): $(OBJECTS)
 	mkdir -p $(BUILD_DIR)
-	$(CXX) $^ -o $@ $(LDFLAGS)
+	$(CXX) $^ -o $@ $(LDFLAGS) -Wl,-sectcreate,__TEXT,__info_plist,$(PLIST)
 
 # Compilation des fichiers objets
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp

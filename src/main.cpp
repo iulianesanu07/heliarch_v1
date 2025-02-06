@@ -6,6 +6,10 @@
 #include <sstream>
 #include <string>
 
+#include "IndexBuffer.h"
+#include "Renderer.h"
+#include "VertexBuffer.h"
+
 struct ShaderProgramSource {
   std::string VertexSource;
   std::string FragmentSource;
@@ -86,6 +90,7 @@ int main() {
 
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
+  glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
   GLFWwindow *window = glfwCreateWindow(800, 600, "Heliarch", nullptr, nullptr);
   if (!window) {
@@ -100,44 +105,91 @@ int main() {
     return -1;
   }
 
-  std::cout << "OpenGL Version: " << glGetString(GL_VERSION) << std::endl;
+  // Ajuste le swap avec le refreshrate de l'ecran (VSYNC)
+  glfwSwapInterval(1);
 
-  unsigned int vao;
-  glGenVertexArrays(1, &vao);
-  glBindVertexArray(vao);
+  // Tentative d'empecher la mise a l'echelle HiDPI
+  int fbWidth, fbHeight;
+  glfwGetFramebufferSize(window, &fbWidth, &fbHeight);
+  std::cout << "Framebuffer size : " << fbWidth << "x" << fbHeight << std::endl;
+  // on cree un nouveau "scope" pour eviter une sorte de connerie que fait opengl
+  {
+    float positions[] = {
+        -0.5f, -0.5f, // 0
+        0.5f,  -0.5f, // 1
+        0.5f,  0.5f,  // 2
+        -0.5f, 0.5f   // 3
+    };
 
-  float positions[6] = {-0.5f, -0.5f, 0.0f, 0.5f, 0.5f, -0.5f};
+    unsigned int indicies[] = {
+        0, 1, 2, // triangle 1
+        0, 2, 3  // triangle 2
+    };
 
-  unsigned int buffer;
-  glGenBuffers(1, &buffer);
-  glBindBuffer(GL_ARRAY_BUFFER, buffer);
-  glBufferData(GL_ARRAY_BUFFER, 6 * sizeof(float), positions, GL_STATIC_DRAW);
+    unsigned int vao;
+    GLCall(glGenVertexArrays(1, &vao));
+    GLCall(glBindVertexArray(vao));
 
-  glEnableVertexAttribArray(0);
-  // index, size, type, normalized, stride, pointer
-  glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(float) * 2, 0);
+    VertexBuffer vb(positions, 4 * 2 * sizeof(float));
 
-  ShaderProgramSource source = ParseShader("res/shaders/Basic.shader");
-  std::cout << "VERTEX" << std::endl;
-  std::cout << source.VertexSource << std::endl;
-  std::cout << "FRAGMENT" << std::endl;
-  std::cout << source.FragmentSource << std::endl;
+    GLCall(glEnableVertexAttribArray(0));
+    GLCall(
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(float) * 2, 0));
 
-  unsigned int shader = CreateShader(source.VertexSource, source.FragmentSource);
-  glUseProgram(shader);
+    IndexBuffer ib(indicies, 6);
 
-  while (!glfwWindowShouldClose(window)) {
-    glClear(GL_COLOR_BUFFER_BIT);
+    ShaderProgramSource source = ParseShader("res/shaders/Basic.shader");
 
-    glDrawArrays(GL_TRIANGLES, 0, 3);
+    /* print shaders
+      std::cout << "VERTEX" << std::endl;
+      std::cout << source.VertexSource << std::endl;
+      std::cout << "FRAGMENT" << std::endl;
+      std::cout << source.FragmentSource << std::endl;
+    */
 
-    glfwSwapBuffers(window);
-    glfwPollEvents();
+    unsigned int shader =
+        CreateShader(source.VertexSource, source.FragmentSource);
+    GLCall(glUseProgram(shader));
+
+    GLCall(int location = glGetUniformLocation(shader, "u_Color"));
+    ASSERT(location != 1);
+    GLCall(glUniform4f(location, 0.8f, 0.3f, 0.8f, 1.0f));
+
+    // Unbind everything
+    GLCall(glBindVertexArray(0));
+    GLCall(glUseProgram(0));
+    GLCall(glBindBuffer(GL_ARRAY_BUFFER, 0));
+    GLCall(glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0));
+
+    float r = 0.0f;
+    float increment = 0.05f;
+    while (!glfwWindowShouldClose(window)) {
+
+      /* Render here */
+      glClear(GL_COLOR_BUFFER_BIT);
+
+      GLCall(glUseProgram(shader)); // Create shader
+      GLCall(glUniform4f(location, r, 0.3f, 0.8f,
+                         1.0f)); // set u_Color in the shader
+
+      GLCall(glBindVertexArray(vao));
+      ib.Bind();
+
+      GLCall(glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nullptr));
+
+      if (r > 1.0f)
+        increment = -0.05f;
+      else if (r < 0.0f)
+        increment = 0.05f;
+
+      r += increment;
+
+      glfwSwapBuffers(window);
+      glfwPollEvents();
+    }
+
+    glDeleteProgram(shader);
   }
-
-  glDeleteProgram(shader);
-
-  glfwDestroyWindow(window);
   glfwTerminate();
   return 0;
 }

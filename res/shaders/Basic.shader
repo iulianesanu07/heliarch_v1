@@ -13,7 +13,9 @@ void main()
 
 layout(location = 0) out vec4 color;
 
+uniform vec4 u_Color;
+
 void main()
 {
-  color = vec4(0.0745f, 0.3922f, 0.5843f, 1.0);
+  color = u_Color;
 }
